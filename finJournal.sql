@@ -12,13 +12,45 @@ select
 	null as DeptId,
 	null as BatchId,
 	CONVERT(VARCHAR(10), je.Date, 110) as DateEffective,
+	CONVERT(VARCHAR(10), je.Date, 110) as DateApplied,
+	CONVERT(VARCHAR(10), je.Dcreated, 110) as DateCreated,
 	jed.AccountId as Account,
 	acct.AccountString,
 	jet.Id as JETypeId,
 	jet.[Description] as JournalEntryType,
 	jed.Amount as Amount,
-	null as AmtCR,
-	null as AmtDR,
+	(
+		case
+			when
+			( 
+				(jed.amount > 0 and gl.accountcategorygroupid = -1) or -- R
+				(jed.amount < 0 and gl.accountcategorygroupid = -2) or -- E
+				(jed.amount < 0 and gl.accountcategorygroupid = -3) or -- A
+				(jed.amount > 0 and gl.accountcategorygroupid = -4) or -- L
+				(jed.amount > 0 and gl.accountcategorygroupid = -5) -- F
+			)
+			then
+				jed.Amount
+			else
+				null
+		end
+	) as AmtCR,
+	(
+		case
+			when	(
+						(jed.amount < 0 and gl.accountcategorygroupid = -1) or 	-- R
+						(jed.amount > 0 and gl.accountcategorygroupid = -2) or	-- E
+						(jed.amount > 0 and gl.accountcategorygroupid = -3) or	-- A
+						(jed.amount < 0 and gl.accountcategorygroupid = -4) or	-- L
+						(jed.amount < 0 and gl.accountcategorygroupid = -5)		-- F
+					)		
+					then 
+						jed.Amount 
+					else
+						null
+					
+				end
+		)as AmtDR,
 	(
 		case	
 			when je.BudgetId = 1 then 'Actual'
@@ -36,6 +68,20 @@ select
 			when gl.AccountCategoryGroupId = -5 then 'Fund Balance'
 		end
 	) as AccountType,
+	(
+		case
+			when jed.amount < 0 and gl.accountcategorygroupid = -1 then 'Debit'		-- R
+			when jed.amount > 0 and gl.accountcategorygroupid = -1 then 'Credit'	-- R
+			when jed.amount > 0 and gl.accountcategorygroupid = -2 then 'Debit'		-- E
+			when jed.amount < 0 and gl.accountcategorygroupid = -2 then 'Credit'	-- E
+			when jed.amount > 0 and gl.accountcategorygroupid = -3 then 'Debit'		-- A
+			when jed.amount < 0 and gl.accountcategorygroupid = -3 then 'Credit'	-- A
+			when jed.amount < 0 and gl.accountcategorygroupid = -4 then 'Debit'		-- L
+			when jed.amount > 0 and gl.accountcategorygroupid = -4 then 'Credit'	-- L
+			when jed.amount < 0 and gl.accountcategorygroupid = -5 then 'Debit'		-- F
+			when jed.amount > 0 and gl.accountcategorygroupid = -5 then 'Credit'	-- F
+		end
+	) as DebitOrCredit,
 	jed.Note as Comment
 from JournalEntry je
 inner join
@@ -53,5 +99,3 @@ inner join
 	and je.FiscalYearId = gl.FiscalYearId
 where
 	je.FiscalYearId = 2018
-
-
